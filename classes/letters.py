@@ -1,5 +1,7 @@
 from .base_letters import Stroke, Letter
 
+# TODO: These parts need adjustment to make the letters more realistic
+
 def get_C() -> Letter:
     """
     Get the letter C.

@@ -14,7 +14,10 @@ class Stroke:
         poses: tp.List[np.ndarray],
         time_list: tp.List[float],
     ):
-        self.poses = poses  # List of poses (x, y, z)
+        '''
+        This class implements a stroke, which is a series of poses that the end effector can draw in one pass without the need to lift the pen.
+        '''
+        self.poses = np.array(poses)  # List of poses (x, y, z)
         # validate the poses, should not exceeds the bounding box
         assert all(isinstance(pose, np.ndarray) and pose.shape == (3,) for pose in poses), "All poses must be 3D numpy arrays"
         assert all(0 <= pose[0] <= MAX_WIDTH_HEIGHT and 0 <= pose[1] <= MAX_WIDTH_HEIGHT and pose[2] == 0 for pose in poses), "All poses must be within the specified bounds"
@@ -45,6 +48,10 @@ class Lift(Stroke):
         lift_height: float = MAX_LIFT_HEIGHT,
         lift_duration: float = LIFT_DURATION,
     ):
+        """
+        This is the motion of lifting the pen to move to a new position.
+        It acts as a connection between two strokes (if they are not connected, like the strokes to draw 'H').
+        """
         start_intermediate = start_pose + np.array([0, 0, lift_height])
         end_intermediate = end_pose + np.array([0, 0, lift_height])
         poses = [start_pose, start_intermediate, end_intermediate, end_pose]
@@ -58,6 +65,10 @@ class Letter:
         letter: str,
         strokes: tp.List[Stroke],
     ):
+        """
+        The class of a letter, consists of a list of strokes.
+        Here in the initialization, we automatically add the lift aftion between strokes if they are not connected.
+        """
         assert len(letter) == 1, "Letter must be a single character"
         self.letter = letter
 
@@ -120,6 +131,9 @@ class String:
         letters: tp.List[Letter],
         letter_width: float = MAX_WIDTH_HEIGHT,
     ):
+        """
+        String is a collection of letters
+        """
         self.letters = letters
         self.letter_width = letter_width  # the width of the letter
         
@@ -135,7 +149,7 @@ class String:
         global_time = 0
         for idx, letter in enumerate(self.letters):
             pose_offset = np.array([idx * self.letter_width, 0, 0])
-            time_steps, poses, velocities, accelerations = letter.get_local_trajectory()
+            time_steps, poses, velocities, accelerations = letter.get_trajectory()
 
             all_time_steps.append(time_steps + global_time)  # shift the time steps to start from the end of the previous letter
             all_poses.append(poses + pose_offset)  # shift the poses to the right for each letter
@@ -148,7 +162,7 @@ class String:
             if idx != len(self.letters) - 1:
                 lift = Lift(
                     start_pose=poses[-1],
-                    end_pose=self.letters[idx + 1].moves[0].poses[0] + pose_offset,
+                    end_pose=self.letters[idx + 1].moves[0].poses[0] + np.array([self.letter_width, 0, 0]),
                     move_duration=1.0,  # TODO: make this a more reasonable value, maybe change with the move distance
                 )
                 all_time_steps.append(lift.time_list + global_time)
@@ -169,6 +183,9 @@ class String:
 def get_2d_visualization(obj, save_filename: str):
     """
     Get the 2D visualization of the object.
+    This function first get the poses from the object (could be Stroke, String or Letter),
+    then remove the poses with non-zero z value.
+    The remaining poses are then plotted in 2D.
     """
     assert hasattr(obj, "get_trajectory"), "Object must have a get_trajectory method"
     _, poses, _, _ = obj.get_trajectory()  # poses: (T, 3)
