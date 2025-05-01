@@ -17,10 +17,10 @@ class Stroke:
         '''
         This class implements a stroke, which is a series of poses that the end effector can draw in one pass without the need to lift the pen.
         '''
-        self.poses = np.array(poses)  # List of poses (x, y, z)
+        poses = np.array(poses)  
+        self.poses = poses # List of poses (x, y, z)
         # validate the poses, should not exceeds the bounding box
         assert all(isinstance(pose, np.ndarray) and pose.shape == (3,) for pose in poses), "All poses must be 3D numpy arrays"
-        assert all(0 <= pose[0] <= MAX_WIDTH_HEIGHT and 0 <= pose[1] <= MAX_WIDTH_HEIGHT and pose[2] == 0 for pose in poses), "All poses must be within the specified bounds"
         self.time_list = time_list  # List of time points for each pose
         assert len(poses) == len(time_list), "Length of poses and time_list must be the same"
         self.duration = time_list[-1] - time_list[0]  # the total time to write the stroke
@@ -30,6 +30,7 @@ class Stroke:
             self.poses,
             self.time_list,
             frequency=50,
+            t_b=0.2,  # the time to blend the velocity
         )
     
     def get_trajectory(self) -> tp.Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -76,12 +77,12 @@ class Letter:
         moves = []
         for i in range(len(strokes) - 1):
             moves.append(strokes[i])
-            if strokes[i].poses[-1] != strokes[i + 1].poses[0]:
+            if not np.all(strokes[i].poses[-1] == strokes[i + 1].poses[0]):
                 # if the two strokes are not connected, add a lift stroke
                 lift = Lift(
                     strokes[i].poses[-1],
                     strokes[i + 1].poses[0],
-                    move_duration=1.0,  # TODO: make this a more reasonable value, maybe change with the move distance
+                    move_duration=3,  # TODO: make this a more reasonable value, maybe change with the move distance
                 )
                 moves.append(lift)
         moves.append(strokes[-1])
@@ -89,9 +90,9 @@ class Letter:
         # validate the moves: they must be connected
         for i, move in enumerate(moves):
             if i != 0:
-                assert move.poses[0] == moves[i - 1].poses[-1], f"Stroke {i} must start where stroke {i-1} ends"
+                assert np.all(move.poses[0] == moves[i - 1].poses[-1]), f"Stroke {i} must start where stroke {i-1} ends"
             if i != len(moves) - 1:
-                assert move.poses[-1] == moves[i + 1].poses[0], f"Stroke {i} must end where stroke {i+1} starts"
+                assert np.all(move.poses[-1] == moves[i + 1].poses[0]), f"Stroke {i} must end where stroke {i+1} starts"
         
         self.moves = moves
 
@@ -110,10 +111,18 @@ class Letter:
         for move in self.moves:
             # shift the time steps to start from the end of the previous move
             time_steps = move.time_steps + global_time
-            all_time_steps.append(time_steps)
-            all_poses.append(move.poses)
-            all_velocities.append(move.velocities)
-            all_accelerations.append(move.accelerations)
+            if len(all_time_steps) == 0:
+                all_time_steps.append(time_steps)
+                all_poses.append(move.poses)
+                all_velocities.append(move.velocities)
+                all_accelerations.append(move.accelerations)
+            else:
+                assert np.all(all_poses[-1][-1] == move.poses[0]), f"Move {move} must start where move {self.moves[-1]} ends"
+                assert time_steps[0] == all_time_steps[-1][-1], f"Move {move} must start where move {self.moves[-1]} ends"
+                all_time_steps.append(time_steps[1:])  # remove the first time step, since it is the same as the last time step of the previous move
+                all_poses.append(move.poses[1:])
+                all_velocities.append(move.velocities[1:])
+                all_accelerations.append(move.accelerations[1:])
 
             global_time += move.duration
         
@@ -151,10 +160,18 @@ class String:
             pose_offset = np.array([idx * self.letter_width, 0, 0])
             time_steps, poses, velocities, accelerations = letter.get_trajectory()
 
-            all_time_steps.append(time_steps + global_time)  # shift the time steps to start from the end of the previous letter
-            all_poses.append(poses + pose_offset)  # shift the poses to the right for each letter
-            all_velocities.append(velocities)
-            all_accelerations.append(accelerations)
+            if len(all_time_steps) == 0:
+                all_time_steps.append(time_steps + global_time)  # shift the time steps to start from the end of the previous letter
+                all_poses.append(poses + pose_offset)  # shift the poses to the right for each letter
+                all_velocities.append(velocities)
+                all_accelerations.append(accelerations)
+            else:
+                assert np.all(all_poses[-1][-1] == poses[0] + pose_offset), f"Letter {letter} must start where letter {self.letters[-1]} ends"
+                assert all_time_steps[-1][-1] == time_steps[0] + global_time, f"Letter {letter} must start where letter {self.letters[-1]} ends"
+                all_time_steps.append(time_steps[1:] + global_time)  # remove the first time step, since it is the same as the last time step of the previous letter
+                all_poses.append(poses[1:] + pose_offset)  # remove the first pose, since it is the same as the last pose of the previous letter
+                all_velocities.append(velocities[1:])
+                all_accelerations.append(accelerations[1:])
 
             global_time += letter.duration
 
@@ -163,12 +180,12 @@ class String:
                 lift = Lift(
                     start_pose=poses[-1],
                     end_pose=self.letters[idx + 1].moves[0].poses[0] + np.array([self.letter_width, 0, 0]),
-                    move_duration=1.0,  # TODO: make this a more reasonable value, maybe change with the move distance
+                    move_duration=6,  # TODO: make this a more reasonable value, maybe change with the move distance
                 )
-                all_time_steps.append(lift.time_list + global_time)
-                all_poses.append(lift.poses + pose_offset)
-                all_velocities.append(lift.velocities)
-                all_accelerations.append(lift.accelerations)
+                all_time_steps.append(lift.time_steps[1:] + global_time)
+                all_poses.append(lift.poses[1:] + pose_offset)
+                all_velocities.append(lift.velocities[1:])
+                all_accelerations.append(lift.accelerations[1:])
 
                 global_time += lift.duration
         
@@ -193,15 +210,17 @@ def get_2d_visualization(obj, save_filename: str):
     # split the poses by sections of non-zero z value
     sections = []
     sec_start = 0
-    while sec_start < len(poses):
-        if poses[sec_start][2] == 0:
-            sec_start += 1
+    i = 0
+    while i < len(poses):
+        if poses[i][2] == 0:
+            i += 1
             continue
-        sec_end = sec_start + 1
-        while sec_end < len(poses) and poses[sec_end][2] != 0:
-            sec_end += 1
-        sections.append(poses[sec_start:sec_end])
-        sec_start = sec_end
+        sections.append(poses[sec_start:i])
+        
+        while i < len(poses) and poses[i][2] != 0:
+            i += 1
+        sec_start = i
+    sections.append(poses[sec_start:i])  # add the last section
     
     # plot the sections
     if isinstance(obj, String):
@@ -210,7 +229,7 @@ def get_2d_visualization(obj, save_filename: str):
         plt.figure(figsize=(10, 10))
     for i, section in enumerate(sections):
         plt.plot(section[:, 0], section[:, 1], label=f"Section {i + 1}")
-        plt.scatter(section[:, 0], section[:, 1], s=10, c="red")
+        # plt.scatter(section[:, 0], section[:, 1], s=10, c="red")
     plt.xlabel("X")
     plt.ylabel("Y")
 
