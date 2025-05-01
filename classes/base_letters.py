@@ -3,6 +3,7 @@ import typing as tp
 import matplotlib.pyplot as plt
 
 from libs.trajectory_generation import generate_trajectory_3d
+from libs.trajectory_generation_cubic_avg_vel import generate_trajectory_3d as generate_trajectory_3d_avg_vel
 from const import *
 
 # Note: By default, x is the horizontal axis, y is the vertical axis, and z is the height
@@ -26,11 +27,11 @@ class Stroke:
         self.duration = time_list[-1] - time_list[0]  # the total time to write the stroke
 
         # solve the trajectory using cubic polynomial
-        self.time_steps, self.poses, self.velocities, self.accelerations = generate_trajectory_3d(
+        self.time_steps, self.poses, self.velocities, self.accelerations = generate_trajectory_3d_avg_vel(
             self.poses,
             self.time_list,
             frequency=50,
-            t_b=0.2,  # the time to blend the velocity
+            # t_b=0.2,  # the time to blend the velocity
         )
     
     def get_trajectory(self) -> tp.Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -77,7 +78,7 @@ class Letter:
         moves = []
         for i in range(len(strokes) - 1):
             moves.append(strokes[i])
-            if not np.all(strokes[i].poses[-1] == strokes[i + 1].poses[0]):
+            if not np.linalg.norm(strokes[i].poses[-1] == strokes[i + 1].poses[0]) < 1e-6:
                 # if the two strokes are not connected, add a lift stroke
                 lift = Lift(
                     strokes[i].poses[-1],
@@ -90,9 +91,9 @@ class Letter:
         # validate the moves: they must be connected
         for i, move in enumerate(moves):
             if i != 0:
-                assert np.all(move.poses[0] == moves[i - 1].poses[-1]), f"Stroke {i} must start where stroke {i-1} ends"
+                assert np.linalg.norm(move.poses[0] - moves[i - 1].poses[-1]) < 1e-6, f"Stroke {i} must start where stroke {i-1} ends"
             if i != len(moves) - 1:
-                assert np.all(move.poses[-1] == moves[i + 1].poses[0]), f"Stroke {i} must end where stroke {i+1} starts"
+                assert np.linalg.norm(move.poses[-1] - moves[i + 1].poses[0]) < 1e-6, f"Stroke {i} must end where stroke {i+1} starts"
         
         self.moves = moves
 
@@ -117,7 +118,7 @@ class Letter:
                 all_velocities.append(move.velocities)
                 all_accelerations.append(move.accelerations)
             else:
-                assert np.all(all_poses[-1][-1] == move.poses[0]), f"Move {move} must start where move {self.moves[-1]} ends"
+                assert np.linalg.norm(all_poses[-1][-1] - move.poses[0]) < 1e-6, f"Move {move} must start where move {self.moves[-1]} ends"
                 assert time_steps[0] == all_time_steps[-1][-1], f"Move {move} must start where move {self.moves[-1]} ends"
                 all_time_steps.append(time_steps[1:])  # remove the first time step, since it is the same as the last time step of the previous move
                 all_poses.append(move.poses[1:])
@@ -166,7 +167,7 @@ class String:
                 all_velocities.append(velocities)
                 all_accelerations.append(accelerations)
             else:
-                assert np.all(all_poses[-1][-1] == poses[0] + pose_offset), f"Letter {letter} must start where letter {self.letters[-1]} ends"
+                assert np.linalg.norm(all_poses[-1][-1] - (poses[0] + pose_offset)) < 1e-6, f"Letter {letter} must start where letter {self.letters[-1]} ends"
                 assert all_time_steps[-1][-1] == time_steps[0] + global_time, f"Letter {letter} must start where letter {self.letters[-1]} ends"
                 all_time_steps.append(time_steps[1:] + global_time)  # remove the first time step, since it is the same as the last time step of the previous letter
                 all_poses.append(poses[1:] + pose_offset)  # remove the first pose, since it is the same as the last pose of the previous letter
@@ -205,7 +206,7 @@ def get_2d_visualization(obj, save_filename: str):
     The remaining poses are then plotted in 2D.
     """
     assert hasattr(obj, "get_trajectory"), "Object must have a get_trajectory method"
-    _, poses, _, _ = obj.get_trajectory()  # poses: (T, 3)
+    time_steps, poses, velocities, accelerations = obj.get_trajectory()  # poses: (T, 3)
     
     # split the poses by sections of non-zero z value
     sections = []
@@ -234,5 +235,27 @@ def get_2d_visualization(obj, save_filename: str):
     plt.ylabel("Y")
 
     plt.savefig(save_filename)
+    plt.close()
+    
+    # plot the velocities for x, y, z
+    plt.figure(figsize=(40, 10))
+    plt.plot(time_steps, velocities[:, 0], label="X Velocity")
+    plt.plot(time_steps, velocities[:, 1], label="Y Velocity")
+    plt.plot(time_steps, velocities[:, 2], label="Z Velocity")
+    plt.xlabel("Time")
+    plt.ylabel("Velocity")
+    plt.legend()
+    plt.savefig(save_filename.replace(".png", "_velocities.png"))
+    plt.close()
+    
+    # plot the accelerations for x, y, z
+    plt.figure(figsize=(40, 10))
+    plt.plot(time_steps, accelerations[:, 0], label="X Acceleration")
+    plt.plot(time_steps, accelerations[:, 1], label="Y Acceleration")
+    plt.plot(time_steps, accelerations[:, 2], label="Z Acceleration")
+    plt.xlabel("Time")
+    plt.ylabel("Acceleration")
+    plt.legend()
+    plt.savefig(save_filename.replace(".png", "_accelerations.png"))
     plt.close()
 
