@@ -1,6 +1,20 @@
 import numpy as np
 from test_fk import get_T, FK_single
 
+joint_limits = [
+    (-np.pi,    np.pi),     # theta1
+    (-np.pi/2,  np.pi/2),   # theta2
+    (-np.pi/2,  3*np.pi/4), # theta3
+    (-np.pi,    np.pi),     # theta4
+    (-np.pi/2,  np.pi/2),   # theta5
+    (-np.pi,    np.pi),     # theta6
+]
+
+def check_joint_limits(thetas, limits):
+    for i, (th, (low, high)) in enumerate(zip(thetas, limits), start=1):
+        if not (low <= th <= high):
+            print(f"Joint {i} out of range: theta{i} = {th:.4f} rad "
+                  f"({np.degrees(th):.1f}°), allowed [{low:.4f}, {high:.4f}] rad")
 
 def base_robot_ik_sec1(xp, yp, zp, l1, l2, l3, curr_theta3=None):
     theta1 = np.arctan2(yp, xp)
@@ -55,7 +69,7 @@ def ik(R_6_0, t, curr_thetas=None):
     zp = t_sec1[2]
     
     theta1, theta2, theta3 = ik_sec1(xp, yp, zp, curr_theta3=curr_thetas[2] if curr_thetas is not None else None)
-    
+    theta2 -= np.pi/20
     arm_ang = np.arctan2(30, 264)
     dh_table = np.array([
         [0, 0, 0, theta1],
@@ -67,7 +81,7 @@ def ik(R_6_0, t, curr_thetas=None):
     R_6_3 = R_0_3 @ R_6_0
     
     theta4 = - np.arctan2(R_6_3[2, 2], R_6_3[0, 2])
-    theta5 = np.arccos(np.clip(R_6_3[1, 2], -1, 1)) 
+    theta5 = np.arccos(np.clip(R_6_3[1, 2], -1, 1)) - np.pi/4
     theta6 = - np.arctan2(R_6_3[1, 1], R_6_3[1, 0])
     
     if curr_thetas is not None:
@@ -87,7 +101,7 @@ def ik(R_6_0, t, curr_thetas=None):
         if np.abs(theta) > np.pi - 0.01:
             theta = theta - 2 * np.pi if theta > 0 else theta + 2 * np.pi
             thetas[i] = theta
-    
+    check_joint_limits(thetas, joint_limits)
     return thetas
 
 

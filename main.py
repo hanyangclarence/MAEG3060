@@ -33,6 +33,8 @@ def send_command(server_ip, server_port, angle_list):
 
 
 if __name__ == "__main__":
+    frequency = 50
+
     cuhk = String(
         letters=[
             get_C(),
@@ -47,7 +49,7 @@ if __name__ == "__main__":
     # rotate the poses by -90 degrees around the z-axis
     rotation_matrix = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
     poses = np.dot(poses, rotation_matrix.T)  # (N, 3)
-    poses = poses + np.array([100, 200, 0])
+    poses = poses + np.array([100, 300, 60])
     
     all_thetas = []
     prev_thetas = np.zeros(6)  # initial joint angles
@@ -81,9 +83,6 @@ if __name__ == "__main__":
         recon_poses.append(pose_gripper[None, ...])
     recon_poses = np.concatenate(recon_poses, axis=0)  # (N, 3)
         
-    
-    
-    
     all_thetas = np.rad2deg(all_thetas)  # convert to degrees
     
     
@@ -100,6 +99,7 @@ if __name__ == "__main__":
     # plt.savefig("joint_angles.png")
     
     out_string = "angle;"
+   
     for j in range(6):
         for v in all_thetas[:, j]:
             out_string += f"{float(v)},"
