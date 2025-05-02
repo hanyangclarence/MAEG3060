@@ -47,12 +47,12 @@ if __name__ == "__main__":
     # rotate the poses by -90 degrees around the z-axis
     rotation_matrix = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
     poses = np.dot(poses, rotation_matrix.T)  # (N, 3)
-    poses = poses + np.array([100, 200, 0])
+    poses = poses + np.array([500, 200, 100])
     
     all_thetas = []
     prev_thetas = np.zeros(6)  # initial joint angles
     orientation = np.array(
-        [[0, 0, -1],
+        [[0, 0, 1],
         [1, 0, 0],
         [0, -1, 0]]
     )

@@ -35,7 +35,7 @@ def FK_single(thetas: np.ndarray):
     assert len(thetas) == 6, "Expected 6 joint angles"
     arm_ang = np.arctan2(30, 264)
     dh_table = np.array([
-        [0, 0, 0, thetas[0]],
+        [0, 0, 159, thetas[0]],
         [-np.pi / 2, 0, 0, thetas[1] - np.pi / 2 + arm_ang],
         [0, 265.69, 0, thetas[2] - np.pi / 4 - arm_ang],
         [-np.pi / 2, 30, 258, thetas[3]],
@@ -52,7 +52,7 @@ def FK_single(thetas: np.ndarray):
 
 if __name__ == "__main__":
     # Test the FK function with some joint angles
-    thetas = np.array([0, 0, 0, 0, 0, 0])
+    thetas = np.array([0, 0, 0, 0, -np.pi / 4, 0])
     pose_gripper, orientation = FK_single(thetas)
     print("Pose of gripper:", pose_gripper)
     print("Orientation of gripper:", orientation)

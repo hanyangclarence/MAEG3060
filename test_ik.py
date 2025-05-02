@@ -2,6 +2,17 @@ import numpy as np
 from test_fk import get_T, FK_single
 
 
+def angle_dist(angles_a, angles_b):
+    assert len(angles_a) == len(angles_b), "Expected same length"
+    dist = 0
+    for i in range(len(angles_a)):
+        dist += np.dot(
+            np.array([np.cos(angles_a[i]), np.sin(angles_a[i])]),
+            np.array([np.cos(angles_b[i]), np.sin(angles_b[i])])
+        )
+    return dist
+
+
 def base_robot_ik_sec1(xp, yp, zp, l1, l2, l3, curr_theta3=None):
     theta1 = np.arctan2(yp, xp)
     
@@ -58,7 +69,7 @@ def ik(R_6_0, t, curr_thetas=None):
     
     arm_ang = np.arctan2(30, 264)
     dh_table = np.array([
-        [0, 0, 0, theta1],
+        [0, 0, 159, theta1],
         [-np.pi / 2, 0, 0, theta2 - np.pi / 2 + arm_ang],
         [0, 265.69, 0, theta3 - np.pi / 4 - arm_ang],
     ])
@@ -69,19 +80,37 @@ def ik(R_6_0, t, curr_thetas=None):
     theta4 = - np.arctan2(R_6_3[2, 2], R_6_3[0, 2])
     theta5 = np.arccos(np.clip(R_6_3[1, 2], -1, 1)) 
     theta6 = - np.arctan2(R_6_3[1, 1], R_6_3[1, 0])
+    theta4 = [theta4, theta4 + np.pi]
+    theta5 = [theta5, -theta5]
+    theta6 = [theta6, theta6 + np.pi]
+
+    correct_angles = []
+    for t4 in theta4:
+        for t5 in theta5:
+            for t6 in theta6:
+                if np.abs(np.sin(t5) * np.cos(t6) - R_6_3[1, 0]) > 1e-10:
+                    continue
+                if np.abs(np.sin(t5) * np.sin(t6) + R_6_3[1, 1]) > 1e-10:
+                    continue
+                if np.abs(np.cos(t4) * np.sin(t5) + R_6_3[0, 2]) > 1e-10:
+                    continue
+                if np.abs(np.sin(t4) * np.sin(t5) - R_6_3[2, 2]) > 1e-10:
+                    continue
+                correct_angles.append([t4, t5, t6])
     
     if curr_thetas is not None:
-        diff = np.abs(np.sin(theta5) - np.sin(curr_thetas[4])) + np.abs(np.cos(theta5) - np.cos(curr_thetas[4]))
-        diff_neg = np.abs(np.sin(-theta5) - np.sin(curr_thetas[4])) + np.abs(np.cos(-theta5) - np.cos(curr_thetas[4]))
-        if diff_neg < diff:
-            theta5 = -theta5
-        for theta4_normed in [theta4, theta4 - np.pi, theta4 + np.pi]:
-            if np.abs(theta4_normed - curr_thetas[3]) < np.abs(theta4 - curr_thetas[3]):
-                theta4 = theta4_normed
-        for theta6_normed in [theta6, theta6 - np.pi, theta6 + np.pi]:
-            if np.abs(theta6_normed - curr_thetas[5]) < np.abs(theta6 - curr_thetas[5]):
-                theta6 = theta6_normed
+        # choose the angles that are closest to the current angles
+        min_dist = float("inf")
+        for angles in correct_angles:
+            dist = angle_dist(angles, curr_thetas[3:])
+            if dist < min_dist:
+                min_dist = dist
+                theta4, theta5, theta6 = angles
+    else:
+        # choose the first angles
+        theta4, theta5, theta6 = correct_angles[0]
     
+    # scale the angles to be in the range [-pi, pi]
     thetas = np.array([theta1, theta2, theta3, theta4, theta5, theta6])
     for i, theta in enumerate(thetas):
         if np.abs(theta) > np.pi - 0.01:
@@ -92,12 +121,25 @@ def ik(R_6_0, t, curr_thetas=None):
 
 
 if __name__ == "__main__":
-    thetas = np.array([-0.5, 1.2, 1.3, np.pi / 3, np.pi / 7, -np.pi / 4])
-    pose_gripper, orientation = FK_single(thetas)
+    # thetas = np.array([-0.5, 1.2, 1.3, np.pi / 3, np.pi / 7, -np.pi / 4])
+    # pose_gripper, orientation = FK_single(thetas)
     
-    # print("Pose of gripper:", pose_gripper)
-    # print("Orientation of gripper:", orientation)
+    # # print("Pose of gripper:", pose_gripper)
+    # # print("Orientation of gripper:", orientation)
     
-    thetas_ik = ik(orientation, pose_gripper, curr_thetas=thetas)
-    print("FK joint angles:", thetas)
-    print("IK joint angles:", thetas_ik)
+    # thetas_ik = ik(orientation, pose_gripper, curr_thetas=thetas)
+    # print("FK joint angles:", thetas)
+    # print("IK joint angles:", thetas_ik)
+
+    pose_gripper = np.array([200, 200, 200])
+    orientation_new = np.array([
+        [0, 0, -1],
+        [1, 0, 0],
+        [0, -1, 0]
+    ])
+    thetas_ik_new = ik(orientation_new, pose_gripper, curr_thetas=np.zeros(6))
+    pose_gripper_recon, orientation_new_recon = FK_single(thetas_ik_new)
+    print(f"GT pose: {pose_gripper}")
+    print(f"Recon pose: {pose_gripper_recon}")
+    print(f"GT orientation:\n{orientation_new}")
+    print(f"Recon orientation:\n{orientation_new_recon}")
