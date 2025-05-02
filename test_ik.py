@@ -58,7 +58,7 @@ def ik(R_6_0, t, curr_thetas=None):
     
     arm_ang = np.arctan2(30, 264)
     dh_table = np.array([
-        [0, 0, 159, theta1 + np.pi / 2],
+        [0, 0, 0, theta1],
         [-np.pi / 2, 0, 0, theta2 - np.pi / 2 + arm_ang],
         [0, 265.69, 0, theta3 - np.pi / 4 - arm_ang],
     ])
