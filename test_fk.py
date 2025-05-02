@@ -35,7 +35,7 @@ def FK_single(thetas: np.ndarray):
     assert len(thetas) == 6, "Expected 6 joint angles"
     arm_ang = np.arctan2(30, 264)
     dh_table = np.array([
-        [0, 0, 159, thetas[0]],
+        [0, 0, 159, thetas[0] + np.pi / 2],
         [-np.pi / 2, 0, 0, thetas[1] - np.pi / 2 + arm_ang],
         [0, 265.69, 0, thetas[2] - np.pi / 4 - arm_ang],
         [-np.pi / 2, 30, 258, thetas[3]],

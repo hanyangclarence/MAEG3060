@@ -32,7 +32,7 @@ def ik_sec1(xp, yp, zp, curr_theta3=None):
     l2 = np.sqrt(30**2 + 264**2)
     l3 = np.sqrt(30**2 + 258**2)
     
-    curr_alpha3 = phi_1 + phi_2 - np.pi / 4 - curr_theta3
+    curr_alpha3 = phi_1 + phi_2 - np.pi / 4 - curr_theta3 if curr_theta3 is not None else None
     
     theta1, alpha_2, alpha_3 = base_robot_ik_sec1(xp, yp, zp, l1, l2, l3, curr_theta3=curr_alpha3)
     
@@ -58,7 +58,7 @@ def ik(R_6_0, t, curr_thetas=None):
     
     arm_ang = np.arctan2(30, 264)
     dh_table = np.array([
-        [0, 0, 159, theta1],
+        [0, 0, 159, theta1 + np.pi / 2],
         [-np.pi / 2, 0, 0, theta2 - np.pi / 2 + arm_ang],
         [0, 265.69, 0, theta3 - np.pi / 4 - arm_ang],
     ])
@@ -75,17 +75,20 @@ def ik(R_6_0, t, curr_thetas=None):
         diff_neg = np.abs(np.sin(-theta5) - np.sin(curr_thetas[4])) + np.abs(np.cos(-theta5) - np.cos(curr_thetas[4]))
         if diff_neg < diff:
             theta5 = -theta5
-        diff = np.abs(np.sin(theta6) - np.sin(curr_thetas[5])) + np.abs(np.cos(theta6) - np.cos(curr_thetas[5]))
-        theta6_normal = theta6 + np.pi if theta6 < 0 else theta6 - np.pi
-        diff_neg = np.abs(np.sin(theta6_normal) - np.sin(curr_thetas[5])) + np.abs(np.cos(theta6_normal) - np.cos(curr_thetas[5]))
-        if diff_neg < diff:
-            theta6 = theta6_normal
-        diff = np.abs(np.sin(theta4) - np.sin(curr_thetas[3])) + np.abs(np.cos(theta4) - np.cos(curr_thetas[3]))
-        theta4_normal = theta4 + np.pi if theta4 < 0 else theta4 - np.pi
-        diff_neg = np.abs(np.sin(theta4_normal) - np.sin(curr_thetas[3])) + np.abs(np.cos(theta4_normal) - np.cos(curr_thetas[3]))
-        if diff_neg < diff:
-            theta4 = theta4_normal    
-    return np.array([theta1, theta2, theta3, theta4, theta5, theta6])
+        for theta4_normed in [theta4, theta4 - np.pi, theta4 + np.pi]:
+            if np.abs(theta4_normed - curr_thetas[3]) < np.abs(theta4 - curr_thetas[3]):
+                theta4 = theta4_normed
+        for theta6_normed in [theta6, theta6 - np.pi, theta6 + np.pi]:
+            if np.abs(theta6_normed - curr_thetas[5]) < np.abs(theta6 - curr_thetas[5]):
+                theta6 = theta6_normed
+    
+    thetas = np.array([theta1, theta2, theta3, theta4, theta5, theta6])
+    for i, theta in enumerate(thetas):
+        if np.abs(theta) > np.pi - 0.01:
+            theta = theta - 2 * np.pi if theta > 0 else theta + 2 * np.pi
+            thetas[i] = theta
+    
+    return thetas
 
 
 if __name__ == "__main__":
