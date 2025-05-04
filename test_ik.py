@@ -10,7 +10,7 @@ def angle_dist(angles_a, angles_b):
             np.array([np.cos(angles_a[i]), np.sin(angles_a[i])]),
             np.array([np.cos(angles_b[i]), np.sin(angles_b[i])])
         )
-    return dist
+    return - dist
 
 
 def base_robot_ik_sec1(xp, yp, zp, l1, l2, l3, curr_theta3=None):
