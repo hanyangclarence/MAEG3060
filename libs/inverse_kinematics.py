@@ -1,5 +1,5 @@
 import numpy as np
-from test_fk import get_T, FK_single
+from libs.forward_kinematics import get_T, FK_single
 
 
 def angle_dist(angles_a, angles_b):
