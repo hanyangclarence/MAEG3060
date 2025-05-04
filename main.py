@@ -1,5 +1,5 @@
 from classes.letters import *
-from classes.base_letters import String
+from classes.base_letters import String, get_2d_visualization
 from libs.inverse_kinematics import ik
 import numpy as np
 import time
@@ -43,6 +43,9 @@ if __name__ == "__main__":
 
     # generate the trajectory
     time_steps, poses, velocities, accelerations = cuhk.get_trajectory()
+    
+    # optional: visualize the trajectory in top-down view
+    get_2d_visualization(cuhk, "cuhk_topdown.png")
     
     # adjust the trajectory to fit the robot's workspace
     rotation_matrix = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])

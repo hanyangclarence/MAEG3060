@@ -2,8 +2,8 @@ import numpy as np
 import typing as tp
 import matplotlib.pyplot as plt
 
-from libs.trajectory_generation import generate_trajectory_3d
-from libs.trajectory_generation_cubic_avg_vel import generate_trajectory_3d as generate_trajectory_3d_avg_vel
+from libs.trajectory_generation_parabolic import generate_trajectory_3d as generate_trajectory_3d_parabolic
+from libs.trajectory_generation_cubic import generate_trajectory_3d as generate_trajectory_3d_cubic
 from const import *
 
 # Note: By default, x is the horizontal axis, y is the vertical axis, and z is the height
@@ -26,13 +26,20 @@ class Stroke:
         assert len(poses) == len(time_list), "Length of poses and time_list must be the same"
         self.duration = time_list[-1] - time_list[0]  # the total time to write the stroke
 
-        # solve the trajectory using cubic polynomial
-        self.time_steps, self.poses, self.velocities, self.accelerations = generate_trajectory_3d_avg_vel(
+        # solve the trajectory using cubic spline
+        self.time_steps, self.poses, self.velocities, self.accelerations = generate_trajectory_3d_cubic(
             self.poses,
             self.time_list,
             frequency=50,
-            # t_b=0.2,  # the time to blend the velocity
         )
+        
+        # # solve the trajectory using parabolic spline, although this does not make much sense for our task
+        # self.time_steps, self.poses, self.velocities, self.accelerations = generate_trajectory_3d_parabolic(
+        #     self.poses,
+        #     self.time_list,
+        #     frequency=50,
+        #     t_b=0.2
+        # )
     
     def get_trajectory(self) -> tp.Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
